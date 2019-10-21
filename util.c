@@ -1,23 +1,31 @@
 #include "util.h"
 
 #include <string.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+#include <unistd.h>
+#include <sys/poll.h>
 
 #define PARAM_BUFFER_SIZE 256
-#define OUT_BUFFER_SIZE 8192
+#define OUT_BUFFER_SIZE 32768
 
 char** paramBuffer = NULL;
 char* outBuffer = NULL;
 
 void initializeParamBuffer()
 {
-    paramBuffer = (char**)calloc(PARAM_BUFFER_SIZE, sizeof(char*));
+    paramBuffer = (char**)malloc(sizeof(char*) * PARAM_BUFFER_SIZE);
 }
 
 void initializeOutBuffer()
 {
     outBuffer = (char*)malloc(sizeof(char) * OUT_BUFFER_SIZE);
+}
+
+void setOutBuffer(char* buff)
+{
+    outBuffer = buff;
 }
 
 int getMaxParamBufferSize()
@@ -55,9 +63,10 @@ void cleanupParamBuffer()
 
 void cleanupOutBuffer()
 {
+    // Make outBuffer zero length
     int i = 0;
     for (i; i < OUT_BUFFER_SIZE; i ++)
-        outBuffer[i] = NULL;
+        outBuffer[i] = '\0';
 }
 
 void setParameterAt(int index, char* parameter)
@@ -72,8 +81,13 @@ char* getParameterAt(int index)
 
 void readLineConsole(char* buffer)
 {
-    gets(buffer, OUT_BUFFER_SIZE);
-    //fgets(buffer, OUT_BUFFER_SIZE, stdin);
+    // scanf("%s", outBuffer);
+    // gets(buffer, OUT_BUFFER_SIZE);
+    // fgets(buffer, OUT_BUFFER_SIZE, STDIN_FILENO);
+    if (fgets(buffer, OUT_BUFFER_SIZE, stdin)) {
+        buffer[strcspn(buffer,"\n")] = '\0';
+    }
+    // getline(buffer, sizeof buffer, 1);
 }
 
 char* concat(char* stringOne, char* stringTwo)
@@ -94,52 +108,32 @@ char* concat(char* stringOne, char* stringTwo)
     return concatenatedString;
 }
 
-char *ltrim(char *str, const char *seps)
-{
-    size_t totrim;
-    if (seps == NULL) {
-        seps = "\t\n\v\f\r ";
-    }
-    totrim = strspn(str, seps);
-    if (totrim > 0) {
-        size_t len = strlen(str);
-        if (totrim == len) {
-            str[0] = '\0';
-        }
-        else {
-            memmove(str, str + totrim, len + 1 - totrim);
-        }
-    }
-    return str;
-}
-
-char *rtrim(char *str, const char *seps)
-{
-    int i;
-    if (seps == NULL) {
-        seps = "\t\n\v\f\r ";
-    }
-    i = strlen(str) - 1;
-    while (i >= 0 && strchr(seps, str[i]) != NULL) {
-        str[i] = '\0';
-        i--;
-    }
-    return str;
-}
-
-char *trim(char *str, const char *seps)
-{
-    return ltrim(rtrim(str, seps), seps);
-}
-
 char* string_copy(char* string)
 {
     size_t size = strlen(string);
-    char* toReturn = (char*)malloc(sizeof(char)*size);
+    char* toReturn = (char*)malloc(sizeof(char)*size + 1);
 
     int i = 0;
     for (i; i < size; i ++)
         toReturn[i] = string[i];
 
+    toReturn[i] = '\0';
+
     return toReturn;
+}
+
+int has_data(int fd)
+{
+    struct pollfd * poll_params = malloc(sizeof(struct pollfd));
+    int retval;
+
+    poll_params[0].fd = fd;
+    poll_params[0].events = POLLIN;
+    poll_params[0].revents = POLLIN;
+    
+    retval = poll(poll_params, 1, 0);
+
+    free(poll_params);
+
+    return retval;
 }

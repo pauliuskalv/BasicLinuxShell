@@ -28,38 +28,41 @@ void mainLoop()
     printf("%s@%s$: ", userName, hostName);
     readLineConsole(getOutBuffer());
 
+    if (strcmp("", getOutBuffer()) == 0)
+      continue;
+
     if (strcmp("exit", getOutBuffer()) == 0)
       break;
 
     int process_count = 0;
+
     char** processList = getSeparateProcessList(getOutBuffer(), &process_count);
 
     // cleanupOutBuffer();
 
-    if (process_count == 1)
+    getArgumentList(processList[0], getParamBuffer());
+    executeProgram(getParamBuffer()[0], getParamBuffer(), NULL);
+    if (process_count > 1)
     {
-      // Single process
-      getArgumentList(getOutBuffer(), getParamBuffer());
-      executeProgram(getParamBuffer()[0], getParamBuffer(), NULL);
-    }
-    else
-    {
-      // Multiple processes
-      getArgumentList(processList[0], getParamBuffer());
-      executeProgram(getParamBuffer()[0], getParamBuffer(), NULL);
-
       int i = 1;
       for (i; i < process_count; i ++)
       {
-        getArgumentList(processList[i], getParamBuffer());
-        executeProgram(getParamBuffer()[0], getParamBuffer(), getOutBuffer());
-      }
+        char* copyOfBuffer = string_copy(getOutBuffer());
 
-      // free up the list
-      for (i = 0; i < process_count; i ++)
-        free(processList[i]);
-      free(processList);
+        getArgumentList(processList[i], getParamBuffer());
+        executeProgram(getParamBuffer()[0], getParamBuffer(), copyOfBuffer);
+        
+        free(copyOfBuffer);
+      }
     }
+
+    // free up the list
+    int i;
+    for (i = 0; i < process_count; i ++)
+    {
+      free(processList[i]);
+    }
+    free(processList);
 
     printf("%s", getOutBuffer());
 

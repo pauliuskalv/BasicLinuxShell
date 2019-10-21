@@ -66,7 +66,7 @@ char** getArgumentList(char* buffer, char** paramBuffer)
     int count = 0;
     while (token)
     {
-        paramBuffer[count] = string_copy(trim(token, NULL));
+        paramBuffer[count] = string_copy(token);
         count ++;
         token = strtok(NULL, " ");
     }
@@ -78,13 +78,13 @@ char** getArgumentList(char* buffer, char** paramBuffer)
 
 char** getSeparateProcessList(char* buffer, int* size)
 {
-    char** list = (char**)malloc(sizeof(char*) * MAX_CHAINED_PROCESS_COUNT);
+    char** list = (char**)calloc(MAX_CHAINED_PROCESS_COUNT, sizeof(char*));
 
     char* token = strtok(buffer, "|");
     int count = 0;
     while (token)
     {
-        list[count] = string_copy(trim(token, NULL));
+        list[count] = string_copy(token);
         count ++;
         token = strtok(NULL, "|");
     }
@@ -115,11 +115,6 @@ int executeProgram(char* programName, char** paramBuffer, char* input)
         return -1;
     }
 
-    fcntl(fd1[0], F_SETFL, O_NONBLOCK);
-    fcntl(fd1[1], F_SETFL, O_NONBLOCK);
-    fcntl(fd2[0], F_SETFL, O_NONBLOCK);
-    fcntl(fd2[1], F_SETFL, O_NONBLOCK);
-
     // Isolate program execution from the shell
     pid_t forkedProcess = fork();
 
@@ -149,7 +144,7 @@ int executeProgram(char* programName, char** paramBuffer, char* input)
         // In parent process
         if (input != NULL)
         {
-            write(fd1[1], getOutBuffer(), strlen(getOutBuffer()));
+            write(fd1[1], input, strlen(getOutBuffer()));
         }
 
         close(fd1[1]); // Close write end pipe
@@ -159,7 +154,8 @@ int executeProgram(char* programName, char** paramBuffer, char* input)
 
         // Read child process output if there's any
         cleanupOutBuffer();
-        read(fd2[0], getOutBuffer(), getMaxOutBufferSize());
+        if (has_data(fd2[0]))
+            read(fd2[0], getOutBuffer(), getMaxOutBufferSize());
 
         close(fd1[0]);
         close(fd2[0]);
