@@ -19,7 +19,7 @@ char* defaultHostname = "hostname";
 
 char* getProgramOutput()
 {
-    return getOutBuffer();
+    return getOutBuffer().bytes;
 }
 
 /**
@@ -94,9 +94,18 @@ char** getSeparateProcessList(char* buffer, int* size)
     return list;
 }
 
-int executeProgram(char* programName, char** paramBuffer, char* input)
+int executeProgram(char* programName, char** paramBuffer, int pipeInput)
 {
     char* filePath = concat(defaultPathPrefix, programName);
+
+    // Check if file is in path and is executable
+    if (access(filePath, F_OK | X_OK) != 0)
+    {
+        printf("Unknown program %s\n", programName);
+        free(filePath);
+        return -1;
+    }
+
     paramBuffer[0] = filePath;
 
     // Declare pipes
@@ -121,7 +130,7 @@ int executeProgram(char* programName, char** paramBuffer, char* input)
     if (forkedProcess == 0)
     {
         // In child process
-        if (input != NULL)
+        if (pipeInput)
         {
             // Redirect stdin to read pipe
             dup2(fd1[0], STDIN_FILENO);
@@ -135,27 +144,37 @@ int executeProgram(char* programName, char** paramBuffer, char* input)
         close(fd2[0]);
         close(fd2[1]);
 
-        execv(filePath, paramBuffer);
+        execvp(filePath, paramBuffer);
 
-        exit(0);
+        exit(1);
     }
     else
     {
         // In parent process
-        if (input != NULL)
+        if (pipeInput && can_write(fd1[1]))
         {
-            write(fd1[1], input, strlen(getOutBuffer()));
+            write(fd1[1], getOutBuffer().bytes, getOutBuffer().bytesInBuffer);
         }
 
         close(fd1[1]); // Close write end pipe
 
-        // Wait for child process to finish executing
-        wait(NULL);
-
         // Read child process output if there's any
-        cleanupOutBuffer();
-        if (has_data(fd2[0]))
-            read(fd2[0], getOutBuffer(), getMaxOutBufferSize());
+        int dataRead = 0;
+        while (has_data(fd2[0]))
+        {
+            dataRead += read(fd2[0], getOutBuffer().bytes + dataRead, getMaxOutBufferSize() - dataRead);
+        }
+
+        if (dataRead == 0)
+        {
+            getOutBuffer().bytes[0] = 0;
+        }
+        else if (getMaxOutBufferSize() > dataRead)
+        {
+            getOutBuffer().bytes[dataRead] = 0;
+        }
+
+        setBytesInBuffer(dataRead);
 
         close(fd1[0]);
         close(fd2[0]);

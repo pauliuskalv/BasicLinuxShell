@@ -8,10 +8,10 @@
 #include <sys/poll.h>
 
 #define PARAM_BUFFER_SIZE 256
-#define OUT_BUFFER_SIZE 32768
+#define OUT_BUFFER_SIZE 32000000 // 32 mb
 
 char** paramBuffer = NULL;
-char* outBuffer = NULL;
+struct out_buffer outBuffer;
 
 void initializeParamBuffer()
 {
@@ -20,12 +20,13 @@ void initializeParamBuffer()
 
 void initializeOutBuffer()
 {
-    outBuffer = (char*)malloc(sizeof(char) * OUT_BUFFER_SIZE);
+    outBuffer.bytes = (char*)malloc(sizeof(char) * OUT_BUFFER_SIZE);
+    outBuffer.bytesInBuffer = 0;
 }
 
-void setOutBuffer(char* buff)
+void setBytesInBuffer(int count)
 {
-    outBuffer = buff;
+    outBuffer.bytesInBuffer = count;
 }
 
 int getMaxParamBufferSize()
@@ -43,7 +44,7 @@ char** getParamBuffer()
     return paramBuffer;
 }
 
-char* getOutBuffer()
+struct out_buffer getOutBuffer()
 {
     return outBuffer;
 }
@@ -66,7 +67,7 @@ void cleanupOutBuffer()
     // Make outBuffer zero length
     int i = 0;
     for (i; i < OUT_BUFFER_SIZE; i ++)
-        outBuffer[i] = '\0';
+        outBuffer.bytes[i] = '\0';
 }
 
 void setParameterAt(int index, char* parameter)
@@ -131,7 +132,23 @@ int has_data(int fd)
     poll_params[0].events = POLLIN;
     poll_params[0].revents = POLLIN;
     
-    retval = poll(poll_params, 1, 0);
+    retval = poll(poll_params, 1, 100);
+
+    free(poll_params);
+
+    return retval;
+}
+
+int can_write(int fd)
+{
+    struct pollfd * poll_params = malloc(sizeof(struct pollfd));
+    int retval;
+
+    poll_params[0].fd = fd;
+    poll_params[0].events = POLLOUT;
+    poll_params[0].revents = POLLOUT;
+    
+    retval = poll(poll_params, 1, 100);
 
     free(poll_params);
 

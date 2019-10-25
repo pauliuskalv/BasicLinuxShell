@@ -22,37 +22,35 @@ void mainLoop()
 {
   char* userName = string_copy(getUserName());
   char* hostName = string_copy(getHostName());
+  int retval = 0;
 
   while(1)
   {
     printf("%s@%s$: ", userName, hostName);
-    readLineConsole(getOutBuffer());
+    readLineConsole(getOutBuffer().bytes);
 
-    if (strcmp("", getOutBuffer()) == 0)
+    if (strcmp("", getOutBuffer().bytes) == 0)
       continue;
 
-    if (strcmp("exit", getOutBuffer()) == 0)
+    if (strcmp("exit", getOutBuffer().bytes) == 0)
       break;
 
     int process_count = 0;
 
-    char** processList = getSeparateProcessList(getOutBuffer(), &process_count);
+    char** processList = getSeparateProcessList(getOutBuffer().bytes, &process_count);
 
     // cleanupOutBuffer();
 
     getArgumentList(processList[0], getParamBuffer());
-    executeProgram(getParamBuffer()[0], getParamBuffer(), NULL);
-    if (process_count > 1)
+    retval = executeProgram(getParamBuffer()[0], getParamBuffer(), 0);
+
+    if (process_count > 1 && retval == 0)
     {
       int i = 1;
-      for (i; i < process_count; i ++)
+      for (i; i < process_count && retval == 0; i ++)
       {
-        char* copyOfBuffer = string_copy(getOutBuffer());
-
         getArgumentList(processList[i], getParamBuffer());
-        executeProgram(getParamBuffer()[0], getParamBuffer(), copyOfBuffer);
-        
-        free(copyOfBuffer);
+        retval = executeProgram(getParamBuffer()[0], getParamBuffer(), 1);
       }
     }
 
@@ -64,9 +62,9 @@ void mainLoop()
     }
     free(processList);
 
-    printf("%s", getOutBuffer());
+    if (retval == 0)
+      printf("%s", getOutBuffer());
 
-    cleanupOutBuffer();
     cleanupParamBuffer();
   }
 
