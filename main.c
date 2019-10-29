@@ -6,6 +6,8 @@
 #include "util.h"
 #include "exec.h"
 
+#include <sys/wait.h>
+
 void mainLoop();
 
 int main()
@@ -42,7 +44,7 @@ void mainLoop()
     // cleanupOutBuffer();
 
     getArgumentList(processList[0], getParamBuffer());
-    retval = executeProgram(getParamBuffer()[0], getParamBuffer(), 0);
+    retval = executeProgram(getParamBuffer()[0], getParamBuffer(), 0, 0);
 
     if (process_count > 1 && retval == 0)
     {
@@ -50,7 +52,7 @@ void mainLoop()
       for (i; i < process_count && retval == 0; i ++)
       {
         getArgumentList(processList[i], getParamBuffer());
-        retval = executeProgram(getParamBuffer()[0], getParamBuffer(), 1);
+        retval = executeProgram(getParamBuffer()[0], getParamBuffer(), getOutBuffer().pipe, i == process_count - 1 ? 1 : 0);
       }
     }
 
@@ -61,6 +63,9 @@ void mainLoop()
       free(processList[i]);
     }
     free(processList);
+
+    readPipe(getOutBuffer().pipe);
+    clearPipe();
 
     if (retval == 0)
       printf("%s", getOutBuffer());

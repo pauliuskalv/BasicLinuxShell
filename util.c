@@ -6,6 +6,7 @@
 
 #include <unistd.h>
 #include <sys/poll.h>
+#include <sys/stat.h>
 
 #define PARAM_BUFFER_SIZE 256
 #define OUT_BUFFER_SIZE 32000000 // 32 mb
@@ -60,6 +61,17 @@ void cleanupParamBuffer()
             paramBuffer[i] = NULL;
         }
     }
+}
+
+void setPipe(int fd)
+{
+    outBuffer.pipe = fd;
+}
+
+void clearPipe()
+{
+    close(outBuffer.pipe);
+    outBuffer.pipe = 0;
 }
 
 void cleanupOutBuffer()

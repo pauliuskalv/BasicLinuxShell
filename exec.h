@@ -7,6 +7,7 @@ char** getSeparateProcessList(char* buffer, int* size);
 char* getUserName();
 char* getHostName();
 
-int executeProgram(char* programName, char** paramBuffer, int pipeInput);
+int executeProgram(char* programName, char** paramBuffer, int pipeInput, int last);
+int readPipe(int fd);
 
 #endif

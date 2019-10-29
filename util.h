@@ -6,12 +6,17 @@
 struct out_buffer {
     char* bytes;
     int bytesInBuffer;
+
+    int pipe;
 };
 
 void initializeParamBuffer();
 char** getParamBuffer();
 int getMaxParamBufferSize();
 void cleanupParamBuffer();
+
+void setPipe(int fd);
+void clearPipe();
 
 void initializeOutBuffer();
 struct out_buffer getOutBuffer();

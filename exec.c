@@ -13,6 +13,8 @@
 
 #define MAX_CHAINED_PROCESS_COUNT 64
 
+pid_t runningPid;
+
 char* defaultPathPrefix = "/bin/";
 char* defaultWhoAmI = "whoami";
 char* defaultHostname = "hostname";
@@ -30,8 +32,10 @@ char* getUserName()
     cleanupParamBuffer();
     cleanupOutBuffer();
 
-    if (executeProgram(defaultWhoAmI, getParamBuffer(), 0) == 0)
+    if (executeProgram(defaultWhoAmI, getParamBuffer(), 0, 1) == 0)
     {
+        readPipe(getOutBuffer().pipe);
+        clearPipe();
         strrchr(getProgramOutput(), '\n')[0] = (char)0;
         return getProgramOutput();
     }
@@ -49,8 +53,10 @@ char* getHostName()
     cleanupParamBuffer();
     cleanupOutBuffer();
 
-    if (executeProgram(defaultHostname, getParamBuffer(), 0) == 0)
+    if (executeProgram(defaultHostname, getParamBuffer(), 0, 1) == 0)
     {
+        readPipe(getOutBuffer().pipe);
+        clearPipe();
         strrchr(getProgramOutput(), '\n')[0] = (char)0;
         return getProgramOutput();
     }
@@ -94,7 +100,7 @@ char** getSeparateProcessList(char* buffer, int* size)
     return list;
 }
 
-int executeProgram(char* programName, char** paramBuffer, int pipeInput)
+int executeProgram(char* programName, char** paramBuffer, int pipeInput, int last)
 {
     char* filePath = concat(defaultPathPrefix, programName);
 
@@ -133,7 +139,8 @@ int executeProgram(char* programName, char** paramBuffer, int pipeInput)
         if (pipeInput)
         {
             // Redirect stdin to read pipe
-            dup2(fd1[0], STDIN_FILENO);
+            dup2(pipeInput, STDIN_FILENO);
+            close(pipeInput);
         }
 
         // Redirect stdout to write pipe
@@ -146,42 +153,54 @@ int executeProgram(char* programName, char** paramBuffer, int pipeInput)
 
         execvp(filePath, paramBuffer);
 
-        exit(1);
+        exit(0);
     }
     else
     {
-        // In parent process
-        if (pipeInput && can_write(fd1[1]))
-        {
-            write(fd1[1], getOutBuffer().bytes, getOutBuffer().bytesInBuffer);
+        if (runningPid && last) {
+            waitpid(runningPid, 0, 0);
         }
 
-        close(fd1[1]); // Close write end pipe
+        runningPid = forkedProcess;
 
-        // Read child process output if there's any
-        int dataRead = 0;
-        while (has_data(fd2[0]))
-        {
-            dataRead += read(fd2[0], getOutBuffer().bytes + dataRead, getMaxOutBufferSize() - dataRead);
-        }
-
-        if (dataRead == 0)
-        {
-            getOutBuffer().bytes[0] = 0;
-        }
-        else if (getMaxOutBufferSize() > dataRead)
-        {
-            getOutBuffer().bytes[dataRead] = 0;
-        }
-
-        setBytesInBuffer(dataRead);
+        setPipe(fd2[0]);
 
         close(fd1[0]);
-        close(fd2[0]);
+        close(fd1[1]);
         close(fd2[1]);
     }
 
     cleanupParamBuffer();
 
     return 0;
+}
+
+int readPipe(int fd)
+{
+    runningPid = 0;
+
+    int dataRead = 0;
+    int prev_read = 0;
+    while (has_data(fd))
+    {
+        dataRead += read(fd, getOutBuffer().bytes + dataRead, getMaxOutBufferSize() - dataRead);
+
+        if (prev_read == dataRead)
+            break;
+
+        prev_read = dataRead;
+    }
+
+    if (dataRead == 0)
+    {
+        getOutBuffer().bytes[0] = 0;
+    }
+    else if (getMaxOutBufferSize() > dataRead)
+    {
+        getOutBuffer().bytes[dataRead] = 0;
+    }
+
+    setBytesInBuffer(dataRead);
+
+    return dataRead;
 }
